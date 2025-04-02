@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1인칭 3D 게임</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB); // 하늘색 배경
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // 바닥 추가
+        const groundGeometry = new THREE.PlaneGeometry(50, 50);
+        const groundMaterial = new THREE.MeshBasicMaterial({ color: 0x808080, side: THREE.DoubleSide }); // 회색 바닥
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        class Player {
+            constructor() {
+                this.mesh = new THREE.Object3D();
+                this.mesh.position.set(0, 0.6, 0); // 시야를 더 낮춤
+                scene.add(this.mesh);
+            }
+            move(dx, dz) {
+                this.mesh.position.x += dx;
+                this.mesh.position.z += dz;
+            }
+        }
+
+        class Enemy {
+            constructor(x, z) {
+                const geometry = new THREE.BoxGeometry(1, 1, 1);
+                const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, 0.5, z);
+                this.health = 3;
+                scene.add(this.mesh);
+            }
+        }
+
+        class Attack {
+            constructor(x, z) {
+                const geometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 12);
+                const material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, 0.6, z);
+                scene.add(this.mesh);
+                this.speed = 0.2;
+            }
+            update() {
+                this.mesh.position.z -= this.speed;
+            }
+        }
+
+        const player = new Player();
+        const enemies = [];
+        const attacks = [];
+        const keys = {};
+
+        window.addEventListener("keydown", (e) => keys[e.key] = true);
+        window.addEventListener("keyup", (e) => keys[e.key] = false);
+
+        function spawnEnemy() {
+            const x = (Math.random() - 0.5) * 20;
+            const z = (Math.random() - 0.5) * 20;
+            enemies.push(new Enemy(x, z));
+        }
+        setInterval(spawnEnemy, 10000);
+
+        function attack() {
+            const attackEffect = new Attack(player.mesh.position.x, player.mesh.position.z - 1);
+            attacks.push(attackEffect);
+        }
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "x" || e.key === "X") {
+                attack();
+            }
+        });
+
+        camera.position.set(0, 0.6, 0);
+        player.mesh.add(camera);
+
+        function gameLoop() {
+            let dx = 0, dz = 0;
+            if (keys["ArrowUp"]) dz = -0.1;
+            if (keys["ArrowDown"]) dz = 0.1;
+            if (keys["ArrowLeft"]) dx = -0.1;
+            if (keys["ArrowRight"]) dx = 0.1;
+            player.move(dx, dz);
+
+            attacks.forEach((attack, index) => {
+                attack.update();
+                
+                enemies.forEach((enemy, enemyIndex) => {
+                    if (attack.mesh.position.distanceTo(enemy.mesh.position) < 1) {
+                        enemy.health--;
+                        scene.remove(attack.mesh);
+                        attacks.splice(index, 1);
+                        if (enemy.health <= 0) {
+                            scene.remove(enemy.mesh);
+                            enemies.splice(enemyIndex, 1);
+                        }
+                    }
+                });
+
+                if (attack.mesh.position.z < -10) {
+                    scene.remove(attack.mesh);
+                    attacks.splice(index, 1);
+                }
+            });
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
